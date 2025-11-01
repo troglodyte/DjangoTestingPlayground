@@ -1,0 +1,66 @@
+
+services:
+  postgres-dj:
+    image: postgres:latest
+    container_name: postgres-dj
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+  rabbitmq-dj:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-dj
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management interface port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis-dj:
+    image: redis:latest
+    container_name: redis-dj
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass redis123
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "redis123", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  pyserver-dj:
+    build: .
+    image: python:3.9.6-slim
+    container_name: django-server
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=DjangoProject.settings
+      - DATABASE_URL=postgres://postgres:postgres@postgres-dj:5432/mydb
+      - DEBUG=1
+    depends_on:
+      - postgres-dj
+      - rabbitmq-dj
+      - redis-dj
+    command: >
+      bash -c "pip install -r requirements.txt
+      && python manage.py migrate
+      && python manage.py runserver 0.0.0.0:8000"
+
+volumes:
+  postgres_data:
+
