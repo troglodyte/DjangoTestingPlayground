@@ -41,26 +41,33 @@ services:
 
   pyserver-dj:
     build: .
-    image: python:3.9.6-slim
+    image: caddy:2-alpine
     container_name: django-server
     working_dir: /app
     volumes:
       - .:/app
+      - caddy_data:/data
+      - caddy_config:/config
     ports:
-      - "8000:8000"
+      - "8001:8001"
+      - "443:443"
     environment:
       - DJANGO_SETTINGS_MODULE=DjangoProject.settings
       - DATABASE_URL=postgres://postgres:postgres@postgres-dj:5432/mydb
-      - DEBUG=1
+      - DEBUG=0
     depends_on:
       - postgres-dj
       - rabbitmq-dj
       - redis-dj
     command: >
-      bash -c "pip install -r requirements.txt
+      sh -c "apk add --no-cache python3 py3-pip
+      && pip install -r requirements.txt gunicorn
       && python manage.py migrate
-      && python manage.py runserver 0.0.0.0:8000"
+      && gunicorn DjangoProject.wsgi:application --bind 0.0.0.0:8000
+      && caddy run --config /app/Caddyfile"
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
 
